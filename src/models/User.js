@@ -20,6 +20,7 @@ class User {
             phone: phone || null,
             avatar: null,
             isVerified: false,
+            blocked: false,
             role: 'user',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -152,6 +153,24 @@ class User {
         // Return without password
         const { password: _, ...userWithoutPassword } = result.Attributes;
         return userWithoutPassword;
+    }
+
+    // Delete user
+    static async delete(id) {
+        const { DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+
+        const command = new DeleteCommand({
+            TableName: TABLE_NAME,
+            Key: { id }
+        });
+
+        await dynamoDB.send(command);
+        return { success: true };
+    }
+
+    // Block/Unblock user
+    static async setBlockedStatus(id, blocked) {
+        return await this.update(id, { blocked });
     }
 }
 

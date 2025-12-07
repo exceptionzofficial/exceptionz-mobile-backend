@@ -29,7 +29,7 @@ router.get('/users', authMiddleware, adminCheck, async (req, res) => {
 
         const command = new ScanCommand({
             TableName: TABLE_NAME,
-            ProjectionExpression: 'id, #name, email, phone, createdAt',
+            ProjectionExpression: 'id, #name, email, phone, blocked, createdAt',
             ExpressionAttributeNames: { '#name': 'name' }
         });
 
@@ -72,6 +72,33 @@ router.get('/users/search', authMiddleware, adminCheck, async (req, res) => {
         res.json({ success: true, users: filtered.slice(0, 10) });
     } catch (error) {
         console.error('User search error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/admin/users/:id/block
+// @desc    Block or unblock a user
+// @access  Admin
+router.put('/users/:id/block', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const { blocked } = req.body;
+        const user = await User.setBlockedStatus(req.params.id, blocked);
+        res.json({ success: true, user });
+    } catch (error) {
+        console.error('Block user error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/admin/users/:id
+// @desc    Delete a user
+// @access  Admin
+router.delete('/users/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        await User.delete(req.params.id);
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
