@@ -8,6 +8,8 @@ const ClientData = require('../models/ClientData');
 const User = require('../models/User');
 const Quote = require('../models/Quote');
 const Project = require('../models/Project');
+const Appointment = require('../models/Appointment');
+const SupportTicket = require('../models/SupportTicket');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -274,6 +276,120 @@ router.post('/quotes/submit', async (req, res) => {
         res.json({ success: true, message: 'Quote submitted' });
     } catch (error) {
         console.error('Submit quote error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ===== APPOINTMENT ROUTES =====
+
+// @route   GET /api/admin/appointments
+// @desc    Get all appointments
+// @access  Admin
+router.get('/appointments', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const appointments = await Appointment.findAll();
+        res.json({ success: true, appointments });
+    } catch (error) {
+        console.error('Get appointments error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   GET /api/admin/appointments/:id
+// @desc    Get appointment by ID
+// @access  Admin
+router.get('/appointments/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const appointment = await Appointment.findById(req.params.id);
+        if (!appointment) {
+            return res.status(404).json({ success: false, message: 'Appointment not found' });
+        }
+        res.json({ success: true, appointment });
+    } catch (error) {
+        console.error('Get appointment error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/admin/appointments/:id
+// @desc    Update appointment (e.g., change status)
+// @access  Admin
+router.put('/appointments/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const appointment = await Appointment.update(req.params.id, req.body);
+        res.json({ success: true, appointment });
+    } catch (error) {
+        console.error('Update appointment error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/admin/appointments/:id
+// @desc    Delete appointment
+// @access  Admin
+router.delete('/appointments/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        await Appointment.delete(req.params.id);
+        res.json({ success: true, message: 'Appointment deleted' });
+    } catch (error) {
+        console.error('Delete appointment error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ===== SUPPORT TICKET ROUTES =====
+
+// @route   GET /api/admin/tickets
+// @desc    Get all support tickets
+// @access  Admin
+router.get('/tickets', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const tickets = await SupportTicket.findAll();
+        res.json({ success: true, tickets });
+    } catch (error) {
+        console.error('Get tickets error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   GET /api/admin/tickets/:id
+// @desc    Get ticket by ID
+// @access  Admin
+router.get('/tickets/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const ticket = await SupportTicket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ success: false, message: 'Ticket not found' });
+        }
+        res.json({ success: true, ticket });
+    } catch (error) {
+        console.error('Get ticket error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/admin/tickets/:id
+// @desc    Update ticket (e.g., change status)
+// @access  Admin
+router.put('/tickets/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const ticket = await SupportTicket.update(req.params.id, req.body);
+        res.json({ success: true, ticket });
+    } catch (error) {
+        console.error('Update ticket error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/admin/tickets/:id
+// @desc    Delete ticket
+// @access  Admin
+router.delete('/tickets/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        await SupportTicket.delete(req.params.id);
+        res.json({ success: true, message: 'Ticket deleted' });
+    } catch (error) {
+        console.error('Delete ticket error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
