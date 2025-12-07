@@ -20,8 +20,27 @@ const authMiddleware = async (req, res, next) => {
             process.env.JWT_SECRET || 'default-secret-key'
         );
 
-        // Add user id to request
-        req.user = { id: decoded.id };
+        // Check if user exists and is not blocked
+        const User = require('../models/User');
+        const user = await User.findById(decoded.id);
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        if (user.blocked) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account has been blocked. Please contact support.',
+                blocked: true
+            });
+        }
+
+        // Add user info to request
+        req.user = { id: decoded.id, email: user.email };
 
         next();
     } catch (error) {

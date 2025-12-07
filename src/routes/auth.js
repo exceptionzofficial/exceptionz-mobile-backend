@@ -115,6 +115,15 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Check if user is blocked
+        if (user.blocked) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account has been blocked. Please contact support.',
+                blocked: true
+            });
+        }
+
         // Generate token
         const token = generateToken(user.id);
 
