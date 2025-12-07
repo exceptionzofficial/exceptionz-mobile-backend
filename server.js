@@ -15,6 +15,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', require('./src/routes/admin'));
+app.use('/api/client', require('./src/routes/client'));
 
 // Health check endpoint
 app.get('/', (req, res) => {
