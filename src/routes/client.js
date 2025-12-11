@@ -5,6 +5,8 @@ const Project = require('../models/Project');
 const Appointment = require('../models/Appointment');
 const SupportTicket = require('../models/SupportTicket');
 const User = require('../models/User');
+const QuotePricing = require('../models/QuotePricing');
+const QuoteRequest = require('../models/QuoteRequest');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -55,15 +57,56 @@ router.get('/invoices', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/client/quote
-// @desc    Submit a quote (Authenticated)
+// @desc    Submit a quote request with auto-calculated price
 // @access  Private
 router.post('/quote', authMiddleware, async (req, res) => {
     try {
+        const user = await User.findById(req.user.id);
         const quoteData = req.body;
-        await Quote.create(req.user.id, { ...quoteData, userEmail: req.user.email, userName: req.user.name });
-        res.json({ success: true, message: 'Quote submitted successfully' });
+
+        // Calculate quote based on selections
+        const calculatedQuote = await QuotePricing.calculateQuote(quoteData);
+
+        // Create quote request record
+        const quoteRequest = await QuoteRequest.create({
+            clientId: req.user.id,
+            clientName: user.name,
+            clientEmail: user.email,
+            clientPhone: user.phone || quoteData.phone || '',
+            projectType: quoteData.projectType,
+            platform: quoteData.platform,
+            paymentGateway: quoteData.paymentGateway,
+            webType: quoteData.webType,
+            seo: quoteData.seo,
+            businessType: quoteData.businessType,
+            description: quoteData.description,
+            calculatedQuote,
+        });
+
+        // Also save to old Quote model for backward compatibility
+        await Quote.create(req.user.id, { ...quoteData, userEmail: user.email, userName: user.name });
+
+        res.json({
+            success: true,
+            message: 'Quote submitted successfully',
+            quote: calculatedQuote,
+            requestId: quoteRequest.id
+        });
     } catch (error) {
         console.error('Client quote error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   GET /api/client/quote-requests
+// @desc    Get my quote requests
+// @access  Private
+router.get('/quote-requests', authMiddleware, async (req, res) => {
+    try {
+        const requests = await QuoteRequest.findByClientId(req.user.id);
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error('Get quote requests error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

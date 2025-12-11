@@ -10,6 +10,8 @@ const Quote = require('../models/Quote');
 const Project = require('../models/Project');
 const Appointment = require('../models/Appointment');
 const SupportTicket = require('../models/SupportTicket');
+const QuotePricing = require('../models/QuotePricing');
+const QuoteRequest = require('../models/QuoteRequest');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -394,4 +396,96 @@ router.delete('/tickets/:id', authMiddleware, adminCheck, async (req, res) => {
     }
 });
 
+// ==================== QUOTE PRICING ROUTES ====================
+
+// @route   GET /api/admin/quote-pricing
+// @desc    Get all pricing configuration
+// @access  Admin
+router.get('/quote-pricing', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const pricing = await QuotePricing.getPricing();
+        res.json({ success: true, pricing });
+    } catch (error) {
+        console.error('Get pricing error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/admin/quote-pricing
+// @desc    Update pricing configuration
+// @access  Admin
+router.put('/quote-pricing', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const { pricing } = req.body;
+        const updatedPricing = await QuotePricing.savePricing(pricing);
+        res.json({ success: true, pricing: updatedPricing, message: 'Pricing updated successfully' });
+    } catch (error) {
+        console.error('Update pricing error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ==================== QUOTE REQUESTS ROUTES ====================
+
+// @route   GET /api/admin/quote-requests
+// @desc    Get all quote requests
+// @access  Admin
+router.get('/quote-requests', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const requests = await QuoteRequest.findAll();
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error('Get quote requests error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   GET /api/admin/quote-requests/:id
+// @desc    Get quote request by ID
+// @access  Admin
+router.get('/quote-requests/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const request = await QuoteRequest.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ success: false, message: 'Quote request not found' });
+        }
+        res.json({ success: true, request });
+    } catch (error) {
+        console.error('Get quote request error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/admin/quote-requests/:id
+// @desc    Update quote request status or notes
+// @access  Admin
+router.put('/quote-requests/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const { status, adminNotes } = req.body;
+        const updates = {};
+        if (status) updates.status = status;
+        if (adminNotes !== undefined) updates.adminNotes = adminNotes;
+
+        const request = await QuoteRequest.update(req.params.id, updates);
+        res.json({ success: true, request, message: 'Quote request updated' });
+    } catch (error) {
+        console.error('Update quote request error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/admin/quote-requests/:id
+// @desc    Delete quote request
+// @access  Admin
+router.delete('/quote-requests/:id', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        await QuoteRequest.delete(req.params.id);
+        res.json({ success: true, message: 'Quote request deleted' });
+    } catch (error) {
+        console.error('Delete quote request error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;
+
