@@ -172,6 +172,50 @@ class User {
     static async setBlockedStatus(id, blocked) {
         return await this.update(id, { blocked });
     }
+
+    // Add invoice to user
+    static async addInvoice(userId, invoiceData) {
+        const { url, fileName } = invoiceData;
+
+        // Get current user to check if invoices array exists
+        const user = await this.findByIdWithPassword(userId);
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        const invoice = {
+            id: uuidv4(),
+            url,
+            fileName,
+            uploadedAt: new Date().toISOString(),
+        };
+
+        // Initialize invoices array if it doesn't exist, otherwise append
+        const invoices = user.invoices || [];
+        invoices.push(invoice);
+
+        const command = new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { id: userId },
+            UpdateExpression: 'SET #invoices = :invoices, #updatedAt = :updatedAt',
+            ExpressionAttributeNames: {
+                '#invoices': 'invoices',
+                '#updatedAt': 'updatedAt',
+            },
+            ExpressionAttributeValues: {
+                ':invoices': invoices,
+                ':updatedAt': new Date().toISOString(),
+            },
+            ReturnValues: 'ALL_NEW',
+        });
+
+        const result = await dynamoDB.send(command);
+
+        // Return without password
+        const { password: _, ...userWithoutPassword } = result.Attributes;
+        return userWithoutPassword;
+    }
 }
 
 module.exports = User;

@@ -285,4 +285,34 @@ router.post('/change-password', authMiddleware, async (req, res) => {
     }
 });
 
+// @route   GET /api/auth/invoices
+// @desc    Get logged-in user's invoices
+// @access  Private
+router.get('/invoices', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findByIdWithPassword(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        const invoices = user.invoices || [];
+
+        res.json({
+            success: true,
+            count: invoices.length,
+            invoices: invoices,
+        });
+    } catch (error) {
+        console.error('Get user invoices error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error fetching invoices',
+        });
+    }
+});
+
 module.exports = router;

@@ -487,5 +487,145 @@ router.delete('/quote-requests/:id', authMiddleware, adminCheck, async (req, res
     }
 });
 
+// @route   POST /api/admin/invoice-upload
+// @desc    Upload invoice to S3 and store URL in user record
+// @access  Admin
+router.post('/invoice-upload', authMiddleware, adminCheck, upload.single('file'), async (req, res) => {
+    try {
+        const { userId, fileName } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'User ID is required' });
+        }
+
+        // Import uploadToS3 from s3 config
+        const { uploadToS3 } = require('../config/s3');
+
+        // Upload file to S3
+        const s3Url = await uploadToS3(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype
+        );
+
+        // Add invoice URL to user record
+        const user = await User.addInvoice(userId, {
+            url: s3Url,
+            fileName: fileName || req.file.originalname,
+        });
+
+        res.json({
+            success: true,
+            message: 'Invoice uploaded successfully',
+            invoiceUrl: s3Url,
+            user,
+        });
+    } catch (error) {
+        console.error('Invoice upload error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to upload invoice',
+            error: error.message
+        });
+    }
+});
+
+// @route   GET /api/admin/invoices
+// @desc    Get all invoices from all users
+// @access  Admin
+router.get('/invoices', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const { ScanCommand } = require('@aws-sdk/lib-dynamodb');
+        const { dynamoDB, TABLE_NAME } = require('../config/dynamodb');
+
+        // Scan all users
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+        });
+
+        const result = await dynamoDB.send(command);
+        const users = result.Items || [];
+
+        // Extract invoices from all users
+        const allInvoices = [];
+        users.forEach(user => {
+            if (user.invoices && Array.isArray(user.invoices)) {
+                user.invoices.forEach(invoice => {
+                    allInvoices.push({
+                        ...invoice,
+                        clientId: user.id,
+                        clientName: user.name,
+                        clientEmail: user.email,
+                        clientPhone: user.phone,
+                    });
+                });
+            }
+        });
+
+        // Sort by uploadedAt (newest first)
+        allInvoices.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+        res.json({
+            success: true,
+            count: allInvoices.length,
+            invoices: allInvoices,
+        });
+    } catch (error) {
+        console.error('Get invoices error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @route   GET /api/admin/invoices
+// @desc    Get all invoices from all users
+// @access  Admin
+router.get('/invoices', authMiddleware, adminCheck, async (req, res) => {
+    try {
+        const { ScanCommand } = require('@aws-sdk/lib-dynamodb');
+        const { dynamoDB, TABLE_NAME } = require('../config/dynamodb');
+
+        // Scan all users
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+        });
+
+        const result = await dynamoDB.send(command);
+        const users = result.Items || [];
+
+        // Extract invoices from all users
+        const allInvoices = [];
+        users.forEach(user => {
+            if (user.invoices && Array.isArray(user.invoices)) {
+                user.invoices.forEach(invoice => {
+                    allInvoices.push({
+                        ...invoice,
+                        clientId: user.id,
+                        clientName: user.name,
+                        clientEmail: user.email,
+                        clientPhone: user.phone,
+                    });
+                });
+            }
+        });
+
+        // Sort by uploadedAt (newest first)
+        allInvoices.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+        res.json({
+            success: true,
+            count: allInvoices.length,
+            invoices: allInvoices,
+        });
+    } catch (error) {
+        console.error('Get invoices error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;
+
 
