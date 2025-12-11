@@ -29,7 +29,16 @@ class Quote {
             Item: quote,
         });
 
-        await dynamoDB.send(command);
+        try {
+            await dynamoDB.send(command);
+        } catch (error) {
+            console.error('Error in Quote.create:', error.message);
+            if (error.name === 'ResourceNotFoundException') {
+                console.warn('Table exceptionz-quotes not found. Skipping backup save.');
+            } else {
+                throw error;
+            }
+        }
         return quote;
     }
 
@@ -38,8 +47,16 @@ class Quote {
             TableName: 'exceptionz-quotes',
         });
 
-        const result = await dynamoDB.send(command);
-        return result.Items || [];
+        try {
+            const result = await dynamoDB.send(command);
+            return result.Items || [];
+        } catch (error) {
+            console.error('Error in Quote.findAll:', error.message);
+            if (error.name === 'ResourceNotFoundException') {
+                return [];
+            }
+            throw error;
+        }
     }
 }
 
