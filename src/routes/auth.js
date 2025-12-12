@@ -315,4 +315,224 @@ router.get('/invoices', authMiddleware, async (req, res) => {
     }
 });
 
+// Nodemailer configuration
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'exceptionzofficial@gmail.com',
+        pass: 'qurb pdnk eqcw dfqv'
+    }
+});
+
+// In-memory OTP storage (in production, use Redis or database)
+const otpStore = new Map();
+
+// Generate 6-digit OTP
+const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// @route   POST /api/auth/send-otp
+// @desc    Send OTP to user's email for password reset
+// @access  Public
+router.post('/send-otp', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide your email address',
+            });
+        }
+
+        // Find user by email
+        const user = await User.findByEmail(email);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'No account found with this email address',
+            });
+        }
+
+        // Generate OTP
+        const otp = generateOTP();
+
+        // Store OTP with 10 minute expiration
+        otpStore.set(email.toLowerCase(), {
+            otp,
+            expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+            userId: user.id,
+            userName: user.name
+        });
+
+        // Send OTP via email
+        const mailOptions = {
+            from: '"Exceptionz" <exceptionzofficial@gmail.com>',
+            to: email,
+            subject: '🔐 Password Reset OTP - Exceptionz',
+            html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2px; border-radius: 16px;">
+                    <div style="background: #ffffff; border-radius: 14px; padding: 40px;">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <h1 style="color: #667eea; margin: 0; font-size: 28px;">Exceptionz</h1>
+                            <p style="color: #888; margin-top: 5px;">Password Reset</p>
+                        </div>
+                        
+                        <p style="color: #333; font-size: 16px; line-height: 1.6;">Hello <strong>${user.name}</strong>,</p>
+                        
+                        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+                            We received a request to reset your password. Use the OTP below to verify your identity:
+                        </p>
+                        
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 30px; margin: 25px 0; text-align: center;">
+                            <p style="margin: 0 0 10px 0; color: #fff; font-size: 14px; opacity: 0.9;">Your One-Time Password</p>
+                            <p style="margin: 0; color: #fff; font-size: 36px; font-weight: bold; letter-spacing: 8px; font-family: monospace;">
+                                ${otp}
+                            </p>
+                        </div>
+                        
+                        <p style="color: #e74c3c; font-size: 14px; line-height: 1.6; text-align: center;">
+                            ⏱️ This OTP expires in <strong>10 minutes</strong>
+                        </p>
+                        
+                        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                        
+                        <p style="color: #999; font-size: 12px; text-align: center;">
+                            If you didn't request this password reset, please ignore this email.
+                        </p>
+                        
+                        <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+                            © ${new Date().getFullYear()} Exceptionz. All rights reserved.
+                        </p>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.json({
+            success: true,
+            message: 'OTP has been sent to your email address',
+        });
+
+    } catch (error) {
+        console.error('Send OTP error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send OTP. Please try again later.',
+        });
+    }
+});
+
+// @route   POST /api/auth/verify-otp
+// @desc    Verify OTP for password reset
+// @access  Public
+router.post('/verify-otp', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and OTP',
+            });
+        }
+
+        const storedData = otpStore.get(email.toLowerCase());
+
+        if (!storedData) {
+            return res.status(400).json({
+                success: false,
+                message: 'OTP expired or not found. Please request a new OTP.',
+            });
+        }
+
+        if (Date.now() > storedData.expiresAt) {
+            otpStore.delete(email.toLowerCase());
+            return res.status(400).json({
+                success: false,
+                message: 'OTP has expired. Please request a new OTP.',
+            });
+        }
+
+        if (storedData.otp !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid OTP. Please try again.',
+            });
+        }
+
+        // OTP verified - mark as verified but keep for password reset
+        storedData.verified = true;
+        otpStore.set(email.toLowerCase(), storedData);
+
+        res.json({
+            success: true,
+            message: 'OTP verified successfully. You can now reset your password.',
+        });
+
+    } catch (error) {
+        console.error('Verify OTP error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to verify OTP. Please try again.',
+        });
+    }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password after OTP verification
+// @access  Public
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        if (!email || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and new password',
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters',
+            });
+        }
+
+        const storedData = otpStore.get(email.toLowerCase());
+
+        if (!storedData || !storedData.verified) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please verify OTP first before resetting password.',
+            });
+        }
+
+        // Update password
+        await User.updatePassword(storedData.userId, newPassword);
+
+        // Clear OTP data
+        otpStore.delete(email.toLowerCase());
+
+        res.json({
+            success: true,
+            message: 'Password reset successfully. You can now login with your new password.',
+        });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reset password. Please try again.',
+        });
+    }
+});
+
 module.exports = router;
